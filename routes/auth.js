@@ -14,15 +14,19 @@ router.post('/createuser', [
     body('email', 'Enter a valid email').isEmail(),
     body('password', 'passwrod must be atleast 5 charactor').isLength({ min: 5 }),
 ], async (req, res) => {
+    let success = false
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        return res.status(400).json({ success, errors: errors.array() });
     }
 
     try {
         let user = await UserModel.findOne({ email: req.body.email })
         if (user) {
-            return res.status(400).json({ error: "sorry the email is already exist" })
+            return res.status(400).json({ success, error: "sorry the email is already exist" })
+        }
+        if (req.body.password !== req.body.cnfpassword) {
+            return res.status(401).json({ success, error: "sorry password is note matched" })
         }
 
         // using bcrypt and make password hashing
@@ -43,8 +47,8 @@ router.post('/createuser', [
         }
         const token = jwt.sign(data, JWT_SECRET)
         // console.log(token);
-
-        res.status(200).json({ token })
+        success = true
+        res.status(200).json({ success, token })
     } catch (error) {
         return res.status(500).json({ error: "some error occure" })
     }
@@ -61,6 +65,7 @@ router.post('/login', [
     body('email', 'Enter a valid email').isEmail(),
     body('password', 'passwrod cannot be blank').exists(),
 ], async (req, res) => {
+    let success = false
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
@@ -76,15 +81,18 @@ router.post('/login', [
 
         const isMatch = await bcrypt.compare(password, user.password)
         if (!isMatch) {
+            success = false
             return res.status(400).json({ 'status': 'failed', 'error': 'sorry please try to login with correct credential' });
         }
+
         const data = {
             user: {
                 id: user.id
             }
         }
         const token = jwt.sign(data, JWT_SECRET)
-        res.status(200).json({ token })
+        success = true
+        res.status(200).json({ success, token })
     } catch (error) {
         return res.status(400).json({ 'error': "internal server error" });
     }
@@ -98,7 +106,7 @@ router.post('/login', [
 router.post('/getuser', fetchuser, async (req, res) => {
 
     try {
-        userId = req.user.id
+       const  userId = req.user.id
         const user = await UserModel.findById(userId).select("-password")
         res.status(200).send(user)
     } catch (error) {
